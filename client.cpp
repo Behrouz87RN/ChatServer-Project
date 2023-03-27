@@ -24,6 +24,61 @@ void *get_in_addr(struct sockaddr *sa)
   return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
+void printAllMessages(char* msg, char *nickname){
+
+    char *search = (char *)"MSG ";
+    int len = strlen(msg);
+    int count = 0;
+    int *positions = (int*) malloc(sizeof(int) * len);
+    char messages[20][300] = {0};
+    // Search for all occurrences of "MSG" in the string
+    char *pos = strstr(msg, search);
+    while (pos != NULL) {
+        positions[count] = pos - msg;
+        count++;
+        pos = strstr(pos + 1, search);
+    }
+    positions[count] = strlen(msg);
+    //  printf("Found %d occurrences of '%s':\n", count, search);
+    // Print the positions of all occurrences of "MSG"
+    for (int i = 0; i < count; i++) {
+        messages[i][300] = {0};
+        // printf("position %d\n", positions[i]);
+        strncpy(messages[i], msg + positions[i], positions[i+1]-positions[i]);
+        // printf("mmmmsg:%s\n", messages[i]);
+        if (strlen(messages[i]) > 255 + 4)
+        {
+            printf("Recived message is ignored because it is longer than 255 charachter.\n");
+        } else {
+          char tempMsg[259];
+          strcpy(tempMsg, messages[i]);
+          char *recvNickname;
+          recvNickname = strtok(tempMsg + 4, " ");
+          // printf("nickname:%s\n", recvNickname);
+
+          if (strcmp(nickname, recvNickname) == 0){
+            // self message, do nothing
+          } else {
+            char messageEscaped[259] = {0};
+            strcpy(messageEscaped, messages[i] + 4);
+            printf("%s", messageEscaped);
+          }
+        }
+    }
+    
+    // Free memory
+    free(positions);
+
+    if ( count == 0 && strlen(msg) > 0) {
+       if (strstr(msg, "ERROR") != NULL) {
+            perror(msg);
+          } else {
+            printf("incorrect Message recv\n");
+            printf("%s\n", msg);
+          }
+    }
+};
+
 int main(int argc, char *argv[])
 {
   // Seperating IP and port
@@ -37,7 +92,7 @@ int main(int argc, char *argv[])
 
   int fdmax, i;
   int socket_desc = 0, n = 0;
-  char recvBuff[1024];
+  char recvBuff[5200];
   char result[100];
   int status;
   char myIP[16];
@@ -200,12 +255,12 @@ int main(int argc, char *argv[])
 
           strcpy(message, "MSG ");
           strcat(message, sendBuffer);
-          strcat(message,"\n");
+          //strcat(message,"\n");
 
           if (strlen(message) > 255 + 4)
           {
-            // printf("YOU are Not allowed to write more than 255 character\n");
-            // continue;
+           printf("YOU are Not allowed to write more than 255 character\n");
+             continue;
           }
 
           if (strcmp(sendBuffer, "quit\n") == 0)
@@ -228,27 +283,12 @@ int main(int argc, char *argv[])
         {
           memset(recvBuffer, 0, sizeof(recvBuffer));
           nbyteRecv = recv(socket_desc, recvBuffer, MaxBuff, 0);
-          char message[259] = {0};
+          char message[5200] = {0};
           memcpy(message, recvBuffer, nbyteRecv);
           // printf("recvBuffer: %s\n", recvBuffer);
-         // printf("message from: %s\n", message);
-
-          char *recvNickname;
-          recvNickname = strtok(message + 4, " ");
-
-          if (strcmp(argv[2], recvNickname) == 0){
-            // self message, do nothing
-          } else if (strstr(recvBuff, "ERROR") != NULL) {
-            perror(recvBuff);
-          } else {
-            char messageEscaped[500] = {0};
-            strncpy(messageEscaped, recvBuffer + 4, strlen(recvBuffer)-4);
-            char* ptr;
-            if ( (ptr = strchr(messageEscaped , '\n')) != NULL) {
-                messageEscaped[strlen(messageEscaped)-1] = '\0';
-            }
-            printf("%s\n", messageEscaped);
-          }
+          // printf("message from: %s\n", message);
+          printAllMessages(message, argv[2]);
+          // printAllMessages((char *)"MSG negin message1\nMSG behzad message2\nMSG behrouz message3\n", argv[2]);
 
           fflush(stdout);
         }

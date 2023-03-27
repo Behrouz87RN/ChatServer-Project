@@ -34,50 +34,74 @@ void sendtoall(char *msg, int curr, char *nickname)
     char mainMessage[500] = {0};
     strncpy(mainMessage, msg + 3, strlen(msg)-3);
 
-    char* ptr;
-    if ( (ptr = strchr(msg , '\n')) != NULL) {
-        mainMessage[strlen(mainMessage)-1] = '\0';
-    }
+    pthread_mutex_lock(&mutex);
 
-    if (ret != NULL)
+    for (i = 0; i < n; i++)
     {
-        pthread_mutex_lock(&mutex);
-
-        for (i = 0; i < n; i++)
+        // if (clients[i].socket != curr) // IS not current client
+        // {
+        char se_message4[1024] = {0};
+        // strcpy(se_message4, &clients[i].nickname);
+        strcat(se_message4, "MSG ");
+        strcat(se_message4, nickname);
+        // strcat(se_message4, " ");
+        strcat(se_message4, mainMessage);
+        
+        if (send(clients[i].socket, se_message4, strlen(se_message4), 0) < 0)
         {
-            // if (clients[i].socket != curr) // IS not current client
-            // {
-            char se_message4[1024] = {0};
-            // strcpy(se_message4, &clients[i].nickname);
-            strcat(se_message4, "MSG ");
-            strcat(se_message4, nickname);
-            strcat(se_message4, mainMessage);
-
-            if (send(clients[i].socket, se_message4, strlen(se_message4), 0) < 0)
-            {
-                printf("sending failure \n");
-                exit(0);
-            }
-            // }
+            printf("sending failure \n");
+            exit(0);
         }
-        pthread_mutex_unlock(&mutex);
+        // }
     }
-    else
-    {
-        char se_message3[1024];
+    pthread_mutex_unlock(&mutex);
+}
+
+void distributeAllMessages(char* msg, int curr, char *nickname){
+
+    char *search = (char *)"MSG ";
+    int len = strlen(msg);
+    int count = 0;
+    int *positions = (int*) malloc(sizeof(int) * len);
+    char messages[20][300] = {0};
+
+    
+    // Search for all occurrences of "MSG" in the string
+    char *pos = strstr(msg, search);
+    while (pos != NULL) {
+        positions[count] = pos - msg;
+        count++;
+        pos = strstr(pos + 1, search);
+    }
+    positions[count] = strlen(msg);
+    
+    // Print the positions of all occurrences of "MSG"
+    for (int i = 0; i < count; i++) {
+        messages[i][300] = {0};
+        strncpy(messages[i], msg + positions[i], positions[i+1]-positions[i]);
+        if (strlen(messages[i]) > 255 + 4)
+        {
+            printf("Recived message is ignored because it is longer than 255 charachter.\n");
+        } else {
+            sendtoall(messages[i], curr, nickname);
+        }
+    }
+    
+    // Free memory
+    free(positions);
+
+    if ( count == 0) {
+        char se_message3[5200];
         strcpy(se_message3, "ERROR ");
-        //  strcat(se_message3,mainMessage);
+        strcat(se_message3, msg);
         int sendres = send(curr, se_message3, strlen(se_message3), 0);
         if (sendres < 0)
         {
             printf("Mesage sanding faild");
-            printf("ERROR TO\n");
-
-            exit(0);
         }
-        printf("incorrect Message recv");
+        printf("incorrect Message recv\n");
     }
-}
+};
 
 void *recvmg(void *clientIndex)
 {
@@ -85,17 +109,12 @@ void *recvmg(void *clientIndex)
     int sock = clients[currentClientId].socket;
     char nickname[12];
     strcpy(nickname, clients[currentClientId].nickname);
-    char msg[500];
+    char msg[5200];
     int len, i;
-    while ((len = recv(sock, msg, 500, 0)) > 0)
+    while ((len = recv(sock, msg, 5200, 0)) > 0)
     {
-        if (len > 255 + 4)
-        {
-            printf("Recived message is ignored because it is longer than 255 charachter.\n");
-            continue;
-        }
         msg[len] = '\0';
-        sendtoall(msg, sock, nickname);
+        distributeAllMessages(msg, sock, nickname);
     }
 
     printf("Connection to clinet %s is closed.\n", nickname);
@@ -149,46 +168,6 @@ int main(int argc, char *argv[])
     int rc, socket_desc, clientsockt, sendres, readres;
     char buffer[1024];
     socklen_t len2;
-
-//     struct in6_addr serveraddr;
-//     struct addrinfo clientaddr, hints, *res = NULL;
-
-//     memset(&hints, 0x00, sizeof(hints));
-
-//     hints.ai_family = AF_UNSPEC;
-//     hints.ai_socktype = SOCK_STREAM;
-//     hints.ai_flags = AI_PASSIVE; // use my IP
-
-//     // Get the address information for the server using getaddrinfo().
-
-//     rc = getaddrinfo(Desthost, Destport, &hints, &res);
-//     if (rc != 0)
-//     {
-//         printf("Host not found --> %s\n", gai_strerror(rc));
-//         if (rc == EAI_SYSTEM)
-//             perror("getaddrinfo() failed");
-//         return -1;
-//     }
-
-//     // ***socket create and verification
-
-//     socket_desc = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
-//     if (socket_desc < 0)
-//     {
-//         perror("socket() failed");
-//         return -1;
-//     }
-//     else
-//     {
-
-// #ifdef DEBUG
-//         printf("Socket successfully created..\n");
-// #endif
-//     }
-//     bzero(&serveraddr, sizeof(serveraddr));
-
-
 
    struct addrinfo *p, hints,clientaddr, *res = NULL;
     memset(&hints, 0x00, sizeof(hints));
